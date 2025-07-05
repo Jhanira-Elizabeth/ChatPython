@@ -1,0 +1,20 @@
+# Variables de entorno para configurar en Azure Web App
+# NO subir este archivo - solo para referencia
+
+# 1. OPENAI_API_KEY
+# Nombre: OPENAI_API_KEY
+# Valor: [tu_api_key_real_de_openai]
+
+# 2. DATABASE_URL
+# Nombre: DATABASE_URL
+# Valor: postgres://tursd:elizabeth18.@tursd.postgres.database.azure.com:5432/tursd?sslmode=require
+
+# 3. Variables adicionales para Azure
+# Nombre: SCM_DO_BUILD_DURING_DEPLOYMENT
+# Valor: true
+
+# Nombre: ENABLE_ORYX_BUILD
+# Valor: true
+
+# Nombre: PYTHONPATH
+# Valor: /home/site/wwwroot

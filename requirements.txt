@@ -1,0 +1,16 @@
+# Flask y extensiones
+Flask==2.3.3
+Flask-CORS==4.0.0
+
+# OpenAI
+openai==0.28.1
+
+# PostgreSQL
+psycopg2-binary==2.9.7
+
+# Utilidades
+python-dotenv==1.0.0
+requests==2.31.0
+
+# Para producción (opcional)
+gunicorn==21.2.0
