@@ -624,6 +624,50 @@ def get_categories():
             'status': 'error'
         }), 500
 
+@app.route('/debug', methods=['GET'])
+def debug_database():
+    """Endpoint de debug para verificar tablas en la base de datos"""
+    try:
+        conn = db.get_connection()
+        if not conn:
+            return jsonify({'error': 'No hay conexión a la base de datos'}), 500
+        
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            # Obtener lista de tablas
+            cursor.execute("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                ORDER BY table_name;
+            """)
+            tables = [row['table_name'] for row in cursor.fetchall()]
+            
+            # Verificar si las tablas específicas existen y tienen datos
+            table_info = {}
+            test_tables = ['locales_turisticos', 'lugares_turisticos', 'puntos_turisticos', 'categorias']
+            
+            for table in test_tables:
+                try:
+                    cursor.execute(f"SELECT COUNT(*) as count FROM {table};")
+                    count = cursor.fetchone()['count']
+                    table_info[table] = {'exists': True, 'count': count}
+                except Exception as e:
+                    table_info[table] = {'exists': False, 'error': str(e)}
+            
+            return jsonify({
+                'all_tables': tables,
+                'test_tables': table_info,
+                'database_name': DB_CONFIG['database'],
+                'status': 'success'
+            })
+            
+    except Exception as e:
+        logger.error(f"Error en endpoint /debug: {e}")
+        return jsonify({
+            'error': f'Error en debug: {e}',
+            'status': 'error'
+        }), 500
+
 if __name__ == '__main__':
     # Verificar configuración antes de iniciar
     if not openai.api_key:
