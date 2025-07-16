@@ -14,8 +14,8 @@ from bs4 import BeautifulSoup
 import time
 from difflib import SequenceMatcher
 # from openai import OpenAI # Asegúrate de importar esto si lo usas
-from python.knowledge_base import TurismoKnowledgeBase # Tu clase de base de conocimiento
-from python.internet_searcher import InternetSearcher # Importa tu nueva clase
+from knowledge_base import TurismoKnowledgeBase # Tu clase de base de conocimiento
+from internet_searcher import InternetSearcher # Importa tu nueva clase
 
 
 # Configuración de Logging
