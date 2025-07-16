@@ -41,7 +41,5 @@ venv.bak/
 *.bak
 
 # Archivos específicos del proyecto
-turismo__data.jsonl
-turismo_data_completo_v2.jsonl
 test_*
 diagnose_*
