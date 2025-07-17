@@ -31,6 +31,7 @@ jobs:
       
       - name: Install dependencies
         run: pip install -r requirements.txt
+        working-directory: .
         
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
 
@@ -76,4 +77,4 @@ jobs:
         with:
           app-name: 'tursd-chatbot'
           slot-name: 'Production'
-          
+          package: 'release.zip'         
