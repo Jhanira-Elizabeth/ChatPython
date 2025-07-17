@@ -1,8 +1,3 @@
-"""
-API de Chatbot que usa datos JSONL + Búsqueda en Internet
-Con capacidad de buscar hoteles actualizados online
-"""
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
