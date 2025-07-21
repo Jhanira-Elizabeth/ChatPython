@@ -43,3 +43,6 @@ venv.bak/
 # Archivos específicos del proyecto
 test_*
 diagnose_*
+firebase-adminsdk-*.json
+firebase_credentials.json
+Python/firebase_credentials.json
