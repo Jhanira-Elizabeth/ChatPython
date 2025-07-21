@@ -46,3 +46,4 @@ diagnose_*
 firebase-adminsdk-*.json
 firebase_credentials.json
 Python/firebase_credentials.json
+python/.env
