@@ -150,70 +150,75 @@ def guardar_mensaje(chat_id, rol, contenido):
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    data = request.json
-    chat_id = data.get("chat_id")
-    pregunta_usuario = data.get("message", "").strip()
 
-    if not chat_id or not pregunta_usuario:
-        return jsonify({"error": "Faltan datos"}), 400
+    try:
+        data = request.json
+        chat_id = data.get("chat_id")
+        pregunta_usuario = data.get("message", "").strip()
 
-    historial = obtener_historial(chat_id)
-    historial.append({"role": "user", "content": pregunta_usuario})
+        if not chat_id or not pregunta_usuario:
+            return jsonify({"error": "Faltan datos"}), 400
 
-    contexto_pg = obtener_contexto()
-    contexto_fb = obtener_resenas_procesadas()
-    contexto_completo = (
-        f"DATOS DE LUGARES (PostgreSQL):\n{contexto_pg}\n"
-        f"RESEÑAS DE USUARIOS (Firestore):\n{contexto_fb}\n"
-    )
+        historial = obtener_historial(chat_id)
+        historial.append({"role": "user", "content": pregunta_usuario})
 
-    # Buscar intenciones
-    for intencion, palabras in intenciones_sensibles.items():
-        if any(p in pregunta_usuario.lower() for p in palabras):
-            lugares = buscar_lugares_por_intencion(intencion)
-            actividades = buscar_actividades_por_intencion(intencion)
+        contexto_pg = obtener_contexto()
+        contexto_fb = obtener_resenas_procesadas()
+        contexto_completo = (
+            f"DATOS DE LUGARES (PostgreSQL):\n{contexto_pg}\n"
+            f"RESEÑAS DE USUARIOS (Firestore):\n{contexto_fb}\n"
+        )
 
-            if lugares:
-                contexto_completo += f"\nLUGARES RELACIONADOS CON {intencion.upper()}:\n"
-                for l in lugares:
-                    contexto_completo += f"- {l[0]}: {l[1]} (Etiqueta: {l[2]})\n"
+        # Buscar intenciones
+        for intencion, palabras in intenciones_sensibles.items():
+            if any(p in pregunta_usuario.lower() for p in palabras):
+                lugares = buscar_lugares_por_intencion(intencion)
+                actividades = buscar_actividades_por_intencion(intencion)
 
-            if actividades:
-                contexto_completo += f"\nACTIVIDADES RELACIONADAS CON {intencion.upper()}:\n"
-                for a in actividades:
-                    contexto_completo += f"- {a[0]}: {a[1]} ({a[2]})\n"
+                if lugares:
+                    contexto_completo += f"\nLUGARES RELACIONADOS CON {intencion.upper()}:\n"
+                    for l in lugares:
+                        contexto_completo += f"- {l[0]}: {l[1]} (Etiqueta: {l[2]})\n"
 
-            # Opcional: registrar intención detectada
-            db.collection("intenciones_detectadas").add({
-                "intencion": intencion,
-                "palabras_detectadas": palabras,
-                "timestamp": firestore.SERVER_TIMESTAMP
-            })
+                if actividades:
+                    contexto_completo += f"\nACTIVIDADES RELACIONADAS CON {intencion.upper()}:\n"
+                    for a in actividades:
+                        contexto_completo += f"- {a[0]}: {a[1]} ({a[2]})\n"
 
-    # Construir prompt
-    mensajes_modelo = [
-        {
-            "role": "system",
-            "content": (
-                "Eres un asistente turístico especializado en Ecuador. "
-                "Solo respondes preguntas sobre turismo, lugares, servicios y actividades. "
-                "Si te preguntan algo fuera de eso, responde amablemente que no puedes ayudar.\n\n"
-                f"{contexto_completo}"
-            )
-        }
-    ] + historial
+                # Opcional: registrar intención detectada
+                db.collection("intenciones_detectadas").add({
+                    "intencion": intencion,
+                    "palabras_detectadas": palabras,
+                    "timestamp": firestore.SERVER_TIMESTAMP
+                })
 
-    # Llamada a Azure OpenAI
-    response = client.chat.completions.create(
-        model=GPT_DEPLOYMENT,
-        messages=mensajes_modelo,
-        temperature=0.7,
-        max_tokens=700
-    )
-    respuesta = response.choices[0].message.content.strip()
-    guardar_mensaje(chat_id, "assistant", respuesta)
+        # Construir prompt
+        mensajes_modelo = [
+            {
+                "role": "system",
+                "content": (
+                    "Eres un asistente turístico especializado en Ecuador. "
+                    "Solo respondes preguntas sobre turismo, lugares, servicios y actividades. "
+                    "Si te preguntan algo fuera de eso, responde amablemente que no puedes ayudar.\n\n"
+                    f"{contexto_completo}"
+                )
+            }
+        ] + historial
 
-    return jsonify({"response": respuesta})
+        # Llamada a Azure OpenAI
+        response = client.chat.completions.create(
+            model=GPT_DEPLOYMENT,
+            messages=mensajes_modelo,
+            temperature=0.7,
+            max_tokens=700
+        )
+        respuesta = response.choices[0].message.content.strip()
+        guardar_mensaje(chat_id, "assistant", respuesta)
+
+        return jsonify({"response": respuesta})
+    except Exception:
+        # No mostrar detalles del error al usuario
+        return jsonify({"response": "Lo siento, ocurrió un problema interno. Por favor intenta de nuevo más tarde."})
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8080)
