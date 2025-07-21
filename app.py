@@ -12,8 +12,16 @@ load_dotenv()
 
 # === Inicializar Firebase una sola vez ===
 if not firebase_admin._apps:
-    cred = credentials.Certificate("firebase_credentials.json")
+    import json
+
+if not firebase_admin._apps:
+    cred_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+    if not cred_json:
+        raise ValueError("FIREBASE_CREDENTIALS_JSON no está definido")
+    cred_dict = json.loads(cred_json)
+    cred = credentials.Certificate(cred_dict)
     firebase_admin.initialize_app(cred)
+
 
 db = firestore.client()
 
