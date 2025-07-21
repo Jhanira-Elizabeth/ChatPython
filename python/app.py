@@ -5,15 +5,14 @@ from openai import AzureOpenAI
 from dotenv import load_dotenv
 import firebase_admin
 from firebase_admin import credentials, firestore
+import json
 import re
+import traceback
 
 # === Cargar variables de entorno ===
 load_dotenv()
 
 # === Inicializar Firebase una sola vez ===
-if not firebase_admin._apps:
-    import json
-
 if not firebase_admin._apps:
     cred_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
     if not cred_json:
@@ -22,15 +21,14 @@ if not firebase_admin._apps:
     cred = credentials.Certificate(cred_dict)
     firebase_admin.initialize_app(cred)
 
-
 db = firestore.client()
 
 app = Flask(__name__)
 
-# === Conexión a PostgreSQL ===
+# === Conexión a PostgreSQL (con sslmode=require) ===
 DB_HOST = os.getenv("DB_HOST")
 DB_NAME = os.getenv("DB_NAME")
-DB_USER = os.getenv("DB_USER")
+DB_USER = os.getenv("DB_USER")  # Debe tener formato: tursd@tursd
 DB_PASS = os.getenv("DB_PASS")
 DB_PORT = os.getenv("DB_PORT", 5432)
 
@@ -51,8 +49,9 @@ client = AzureOpenAI(
 )
 GPT_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "chatbot-TURSD")
 
-# === Consulta general para contexto base ===
-QUERY_CONTEXT = """SELECT 
+# === Consulta de contexto base ===
+QUERY_CONTEXT = """
+SELECT 
     lt.nombre AS nombre_local,
     lt.descripcion AS descripcion_local,
     dl.nombre AS nombre_dueno,
@@ -72,8 +71,6 @@ LEFT JOIN puntos_turisticos_etiqueta pte ON pt.id = pte.id_punto_turistico
 LEFT JOIN actividad_punto_turistico apt ON pt.id = apt.id_punto_turistico
 LIMIT 30;
 """
-
-# === Funciones de contexto ===
 
 def obtener_contexto():
     with conn.cursor() as cur:
@@ -110,13 +107,11 @@ def obtener_resenas_procesadas():
         texto_final += "\n".join(f"- {c}" for c in data["comentarios"]) + "\n\n"
     return texto_final or "No se encontraron reseñas."
 
-# === Intenciones base con sinónimos ===
+# === Intenciones con sinónimos ===
 intenciones_sensibles = {
     "comida": ["comida", "gastronomía", "restaurante", "platos", "cocina", "alimentos"],
     "caminata": ["caminata", "senderismo", "andar", "paseo", "excursión", "trekking"]
 }
-
-# === Búsqueda contextual PostgreSQL ===
 
 def buscar_lugares_por_intencion(palabra):
     with conn.cursor() as cur:
@@ -140,8 +135,6 @@ def buscar_actividades_por_intencion(palabra):
         """, (f"%{palabra.lower()}%",))
         return cur.fetchall()
 
-# === Historial y almacenamiento Firestore ===
-
 def obtener_historial(chat_id):
     ref = db.collection("chats").document(chat_id).collection("conversaciones")
     docs = ref.order_by("timestamp").stream()
@@ -154,11 +147,8 @@ def guardar_mensaje(chat_id, rol, contenido):
         "timestamp": firestore.SERVER_TIMESTAMP
     })
 
-# === Ruta principal ===
-
 @app.route("/chat", methods=["POST"])
 def chat():
-
     try:
         data = request.json
         chat_id = data.get("chat_id")
@@ -177,7 +167,7 @@ def chat():
             f"RESEÑAS DE USUARIOS (Firestore):\n{contexto_fb}\n"
         )
 
-        # Buscar intenciones
+        # Intención
         for intencion, palabras in intenciones_sensibles.items():
             if any(p in pregunta_usuario.lower() for p in palabras):
                 lugares = buscar_lugares_por_intencion(intencion)
@@ -193,14 +183,12 @@ def chat():
                     for a in actividades:
                         contexto_completo += f"- {a[0]}: {a[1]} ({a[2]})\n"
 
-                # Opcional: registrar intención detectada
                 db.collection("intenciones_detectadas").add({
                     "intencion": intencion,
                     "palabras_detectadas": palabras,
                     "timestamp": firestore.SERVER_TIMESTAMP
                 })
 
-        # Construir prompt
         mensajes_modelo = [
             {
                 "role": "system",
@@ -213,7 +201,6 @@ def chat():
             }
         ] + historial
 
-        # Llamada a Azure OpenAI
         response = client.chat.completions.create(
             model=GPT_DEPLOYMENT,
             messages=mensajes_modelo,
@@ -224,8 +211,10 @@ def chat():
         guardar_mensaje(chat_id, "assistant", respuesta)
 
         return jsonify({"response": respuesta})
-    except Exception:
-        # No mostrar detalles del error al usuario
+
+    except Exception as e:
+        print("❌ ERROR:", e)
+        traceback.print_exc()
         return jsonify({"response": "Lo siento, ocurrió un problema interno. Por favor intenta de nuevo más tarde."})
 
 if __name__ == "__main__":
